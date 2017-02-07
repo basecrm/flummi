@@ -11,7 +11,6 @@ import de.otto.flummi.query.sort.FieldSortBuilder;
 import de.otto.flummi.query.sort.SortBuilder;
 import de.otto.flummi.response.*;
 import de.otto.flummi.util.HttpClientWrapper;
-import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -22,7 +21,6 @@ import java.util.stream.Collector;
 
 import static de.otto.flummi.RequestBuilderUtil.toHttpServerErrorException;
 import static de.otto.flummi.response.SearchResponse.emptyResponse;
-import static org.slf4j.LoggerFactory.getLogger;
 
 public class SearchRequestBuilder implements RequestBuilder<SearchResponse> {
     private static final JsonObject EMPTY_JSON_OBJECT = new JsonObject();
@@ -32,6 +30,7 @@ public class SearchRequestBuilder implements RequestBuilder<SearchResponse> {
     private final Gson gson;
     private String[] types;
     private JsonObject query;
+    private Boolean version;
     private Integer from;
     private Integer size;
     private Integer timeoutMillis;
@@ -41,8 +40,6 @@ public class SearchRequestBuilder implements RequestBuilder<SearchResponse> {
     private String scroll;
     private QueryBuilder postFilter;
     private List<AggregationBuilder> aggregations;
-
-    public static final Logger LOG = getLogger(SearchRequestBuilder.class);
 
     public SearchRequestBuilder(HttpClientWrapper httpClient, String... indices) {
         this.httpClient = httpClient;
@@ -62,6 +59,11 @@ public class SearchRequestBuilder implements RequestBuilder<SearchResponse> {
 
     public SearchRequestBuilder setQuery(JsonObject query) {
         this.query = query;
+        return this;
+    }
+
+    public SearchRequestBuilder setVersion(Boolean version) {
+        this.version = version;
         return this;
     }
 
@@ -116,13 +118,15 @@ public class SearchRequestBuilder implements RequestBuilder<SearchResponse> {
         return this;
     }
 
-    @Override
-    public SearchResponse execute() {
+    public String executeRaw() {
         try {
             String url = RequestBuilderUtil.buildUrl(indices, types, "_search");
             JsonObject body = new JsonObject();
             if (query != null) {
                 body.add("query", query);
+            }
+            if (version != null) {
+                body.add("version", new JsonPrimitive(version));
             }
             if (storedFields != null) {
                 body.add("stored_fields", storedFields);
@@ -161,14 +165,14 @@ public class SearchRequestBuilder implements RequestBuilder<SearchResponse> {
             if (scroll != null) {
                 boundRequestBuilder.addQueryParam("scroll", scroll);
             }
-
-            Response response = boundRequestBuilder.setBody(gson.toJson(body))
+            Response response = boundRequestBuilder
+                    .setBody(gson.toJson(body))
                     .execute()
                     .get();
 
             //Did not find an entry
             if (response.getStatusCode() == 404) {
-                return emptyResponse();
+                return "";
             }
 
             //Server Error
@@ -176,29 +180,37 @@ public class SearchRequestBuilder implements RequestBuilder<SearchResponse> {
                 throw toHttpServerErrorException(response);
             }
 
-            JsonObject jsonResponse = gson.fromJson(response.getResponseBody(), JsonObject.class);
-            SearchResponse.Builder searchResponse = parseResponse(jsonResponse, scroll, httpClient);
-
-            JsonElement aggregationsJsonElement = jsonResponse.get("aggregations");
-            if (aggregationsJsonElement != null) {
-                final JsonObject aggregationsJsonObject = aggregationsJsonElement.getAsJsonObject();
-
-                aggregations.forEach(a -> {
-                    JsonElement aggreagationElement = aggregationsJsonObject.get(a.getName());
-                    if (aggreagationElement != null) {
-                        AggregationResult aggregation = a.parseResponse(aggreagationElement.getAsJsonObject());
-                        searchResponse.addAggregation(a.getName(), aggregation);
-                    }
-                });
-            }
-            return searchResponse.build();
+            return response.getResponseBody();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } catch (ExecutionException e) {
+        } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public SearchResponse execute() {
+        String response = executeRaw();
+        if (response == null || response.isEmpty()) {
+            return emptyResponse();
+        }
+
+        JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+        SearchResponse.Builder searchResponse = parseResponse(jsonResponse, scroll, httpClient);
+
+        JsonElement aggregationsJsonElement = jsonResponse.get("aggregations");
+        if (aggregationsJsonElement != null) {
+            final JsonObject aggregationsJsonObject = aggregationsJsonElement.getAsJsonObject();
+
+            aggregations.forEach(a -> {
+                JsonElement aggreagationElement = aggregationsJsonObject.get(a.getName());
+                if (aggreagationElement != null) {
+                    AggregationResult aggregation = a.parseResponse(aggreagationElement.getAsJsonObject());
+                    searchResponse.addAggregation(a.getName(), aggregation);
+                }
+            });
+        }
+        return searchResponse.build();
     }
 
     private static Collector<AggregationBuilder, JsonObject, JsonObject> toJsonObject() {
@@ -228,10 +240,19 @@ public class SearchRequestBuilder implements RequestBuilder<SearchResponse> {
             String id = asJsonObject.get("_id").getAsString();
             JsonElement source = asJsonObject.get("_source");
             JsonElement hitFields = asJsonObject.get("fields");
+            JsonElement version = asJsonObject.get("_version");
+            JsonElement parent = asJsonObject.get("_parent");
+            JsonElement routing = asJsonObject.get("_routing");
+            JsonElement type = asJsonObject.get("_type");
             SearchHit hit = new SearchHit(id,
                     source != null ? source.getAsJsonObject() : null,
                     hitFields != null ? hitFields.getAsJsonObject() : EMPTY_JSON_OBJECT,
-                    score);
+                    score,
+                    version != null ? version.getAsLong() : null,
+                    parent != null ? parent.getAsString() : null,
+                    routing != null ? routing.getAsString() : null,
+                    type != null ? type.getAsString() : null
+            );
             searchHitsCurrentPage.add(hit);
         }
         if(scroll!=null) {

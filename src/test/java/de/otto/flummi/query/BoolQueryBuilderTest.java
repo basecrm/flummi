@@ -128,7 +128,7 @@ public class BoolQueryBuilderTest {
         try {
             testee.build();
         } catch (RuntimeException e) {
-            assertThat(e.getMessage(), is("mustFilter and mustNotFilter are empty"));
+            assertThat(e.getMessage(), is("mustFilter, mustNotFilter, and should filters are empty"));
         }
 
         //then

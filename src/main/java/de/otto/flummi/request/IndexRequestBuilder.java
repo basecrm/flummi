@@ -11,6 +11,8 @@ import org.slf4j.Logger;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import static de.otto.flummi.RequestBuilderUtil.buildUrl;
@@ -18,21 +20,20 @@ import static de.otto.flummi.RequestBuilderUtil.toHttpServerErrorException;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class IndexRequestBuilder implements RequestBuilder<Void> {
+    public static final Logger LOG = getLogger(IndexRequestBuilder.class);
     private final Gson gson;
     private JsonPrimitive id;
     private String indexName;
     private String documentType;
-    @Deprecated
-    private JsonObject source;
-    private String parent;
-
-    public static final Logger LOG = getLogger(IndexRequestBuilder.class);
+    private String jsonBody;
+    private Map<String, Object> queryParams;
     private HttpClientWrapper httpClient;
     private Index index;
 
     public IndexRequestBuilder(HttpClientWrapper httpClient) {
         this.httpClient = httpClient;
         this.gson = new Gson();
+        this.queryParams = new HashMap<>();
     }
 
     public IndexRequestBuilder setId(String id) {
@@ -57,7 +58,12 @@ public class IndexRequestBuilder implements RequestBuilder<Void> {
 
     @Deprecated
     public IndexRequestBuilder setSource(JsonObject source) {
-        this.source = source;
+        this.jsonBody = gson.toJson(source);
+        return this;
+    }
+
+    public IndexRequestBuilder setJsonBody(String jsonBody) {
+        this.jsonBody = jsonBody;
         return this;
     }
 
@@ -66,20 +72,24 @@ public class IndexRequestBuilder implements RequestBuilder<Void> {
         return this;
     }
 
-    public IndexRequestBuilder setParent(String parent) {
-        this.parent = parent;
+    public IndexRequestBuilder setParent(Object parent) {
+        return addQueryParam("parent", parent);
+    }
+
+    public IndexRequestBuilder addQueryParam(String key, Object value) {
+        this.queryParams.put(key, value);
         return this;
     }
 
     @Override
     public Void execute() {
-        if (source == null) {
+        if (jsonBody == null) {
             if (index == null) {
-                throw new IllegalStateException("either source or indexSettings must exist");
+                throw new IllegalStateException("either jsonBody or indexSettings must exist");
             }
         } else {
             if (index != null) {
-                throw new IllegalStateException("either source or indexSettings is allowed to specified");
+                throw new IllegalStateException("either jsonBody or indexSettings is allowed to specified");
             }
         }
         try {
@@ -91,9 +101,12 @@ public class IndexRequestBuilder implements RequestBuilder<Void> {
                 String url = buildUrl(indexName, documentType);
                 reqBuilder = httpClient.preparePost(url);
             }
-            if (parent != null) {
-                reqBuilder.addQueryParam("parent", parent);
-            }
+
+            queryParams
+                    .entrySet()
+                    .stream()
+                    .filter(e -> e.getValue() != null)
+                    .forEach(entry -> reqBuilder.addQueryParam(entry.getKey(), String.valueOf(entry.getValue())));
 
             String body = createBody();
             Response response = reqBuilder.setBody(body).setBodyEncoding("UTF-8").execute().get();
@@ -101,25 +114,18 @@ public class IndexRequestBuilder implements RequestBuilder<Void> {
                 throw toHttpServerErrorException(response);
             }
             return null;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } catch (ExecutionException e) {
+        } catch (UnsupportedEncodingException | InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
     }
 
     private String createBody() {
-        if (source != null) {
-            return gson.toJson(source);
+        if (jsonBody != null) {
+            return jsonBody;
         }
         if (index != null) {
             return gson.toJson(index);
         }
         throw new IllegalStateException();
-
-
     }
-
 }

@@ -2,6 +2,7 @@ package de.otto.flummi.request;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.Response;
 import de.otto.flummi.RequestBuilderUtil;
 import de.otto.flummi.response.GetResponse;
@@ -22,6 +23,7 @@ public class GetRequestBuilder implements RequestBuilder<GetResponse> {
     private final String documentType;
     private final String id;
     private final Gson gson;
+    private String routing;
 
     public static final Logger LOG = getLogger(GetRequestBuilder.class);
 
@@ -37,7 +39,11 @@ public class GetRequestBuilder implements RequestBuilder<GetResponse> {
     public GetResponse execute() {
         try {
             String url = RequestBuilderUtil.buildUrl(indexName, documentType, URLEncoder.encode(id, "UTF-8"));
-            Response response = httpClient.prepareGet(url).execute().get();
+            final AsyncHttpClient.BoundRequestBuilder reqBuilder = httpClient.prepareGet(url);
+            if (routing != null) {
+                reqBuilder.addQueryParam("routing", routing);
+            }
+            Response response = reqBuilder.execute().get();
             if (response.getStatusCode() >= 300 && 404 != response.getStatusCode()) {
                 throw toHttpServerErrorException(response);
             }
@@ -53,11 +59,13 @@ public class GetRequestBuilder implements RequestBuilder<GetResponse> {
 
         } catch (IOException e) {
             throw new UncheckedIOException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } catch (ExecutionException e) {
+        } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
     }
 
+    public GetRequestBuilder setRouting(String routing) {
+        this.routing = routing;
+        return this;
+    }
 }

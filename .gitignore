@@ -4,4 +4,5 @@ flummi.iws
 build
 out
 .gradle
+bin/gradlew.bat
 

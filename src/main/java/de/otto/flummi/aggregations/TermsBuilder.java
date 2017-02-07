@@ -55,6 +55,11 @@ public class TermsBuilder extends SubAggregationBuilder<TermsBuilder> {
             orders.forEach(e -> orderObject.add(e.getKey(), new JsonPrimitive(e.getValue().toString())));
             fields.add("order", orderObject);
         }
+        if (subAggregations != null) {
+            JsonObject aggsJson = new JsonObject();
+            subAggregations.forEach(a -> aggsJson.add(a.getName(), a.build()));
+            jsonObject.add("aggregations", aggsJson);
+        }
         return jsonObject;
     }
 

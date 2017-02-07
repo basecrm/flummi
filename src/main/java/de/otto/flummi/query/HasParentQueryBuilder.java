@@ -17,7 +17,7 @@ public class HasParentQueryBuilder implements QueryBuilder {
     @Override
     public JsonObject build() {
         JsonObject hasParent = new JsonObject();
-        hasParent.add("type", new JsonPrimitive(type));
+        hasParent.add("parent_type", new JsonPrimitive(type));
         hasParent.add("query", query.build());
         return object(
                 "has_parent",

@@ -9,8 +9,6 @@ import java.util.List;
 
 import static de.otto.flummi.GsonCollectors.toJsonArray;
 import static de.otto.flummi.request.GsonHelper.object;
-import static java.util.Arrays.asList;
-import static java.util.stream.Collectors.toList;
 
 public class QueryBuilders {
 
@@ -97,7 +95,7 @@ public class QueryBuilders {
         return () -> {
             JsonObject jsonObject = new JsonObject();
             JsonObject nested = new JsonObject();
-            nested.add("filter", queryBuilder.build());
+            nested.add("query", queryBuilder.build());
             nested.add("path", new JsonPrimitive(path));
             jsonObject.add("nested", nested);
             return jsonObject;
@@ -142,7 +140,15 @@ public class QueryBuilders {
         return new HasParentQueryBuilder(type, query);
     }
 
+    public static HasChildQueryBuilder hasChild(String type, QueryBuilder query) {
+        return new HasChildQueryBuilder(type, query);
+    }
+
     public static FunctionScoreQueryBuilder functionScoreQuery(QueryBuilder innerQuery) {
         return new FunctionScoreQueryBuilder(innerQuery);
+    }
+
+    public static ConstantScoreQueryBuilder constantScoreQuery(QueryBuilder filterQuery) {
+        return new ConstantScoreQueryBuilder(filterQuery);
     }
 }

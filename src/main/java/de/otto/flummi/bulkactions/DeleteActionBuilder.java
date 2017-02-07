@@ -11,6 +11,7 @@ public class DeleteActionBuilder implements BulkActionBuilder {
     private final String indexName;
     private final String id;
     private final String type;
+    private String parent;
     private String routing;
     private final Gson gson;
 
@@ -38,12 +39,20 @@ public class DeleteActionBuilder implements BulkActionBuilder {
         if(routing!=null) {
             bulkObject.add("_routing", new JsonPrimitive(routing));
         }
+        if(parent!=null) {
+            bulkObject.add("_parent", new JsonPrimitive(parent));
+        }
         JsonObject jsonObject = object("delete", bulkObject);
         return gson.toJson(jsonObject);
     }
 
     public DeleteActionBuilder setRouting(String routing) {
         this.routing = routing;
+        return this;
+    }
+
+    public DeleteActionBuilder setParent(String parent) {
+        this.parent = parent;
         return this;
     }
 }

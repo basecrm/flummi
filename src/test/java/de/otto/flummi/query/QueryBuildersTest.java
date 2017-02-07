@@ -91,7 +91,7 @@ public class QueryBuildersTest {
         JsonObject jsonObject = QueryBuilders.nestedQuery("somePath", QueryBuilders.prefixFilter("someName", "somePrefix")).build();
         JsonObject nestedObject = new JsonObject();
         nestedObject.add("path", new JsonPrimitive("somePath"));
-        nestedObject.add("filter", object("prefix", object("someName", "somePrefix")));
+        nestedObject.add("query", object("prefix", object("someName", "somePrefix")));
         assertThat(jsonObject, is(object("nested", nestedObject)));
     }
 

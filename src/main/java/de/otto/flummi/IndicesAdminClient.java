@@ -13,6 +13,7 @@ import de.otto.flummi.util.HttpClientWrapper;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import static de.otto.flummi.request.GsonHelper.object;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 public class IndicesAdminClient {
@@ -164,6 +166,17 @@ public class IndicesAdminClient {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void flushIndicies(String... indexNames) {
+        final String indices = Arrays.stream(indexNames).collect(joining(","));
+        try {
+            httpClient.preparePost("/" + indices + "/_flush")
+                    .execute()
+                    .get();
+        } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
     }

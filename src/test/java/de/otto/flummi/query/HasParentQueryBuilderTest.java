@@ -15,7 +15,7 @@ public class HasParentQueryBuilderTest {
         JsonObject queryAsJson = new HasParentQueryBuilder("someType", QueryBuilders.matchAll()).build();
 
         //then
-        JsonObject query = object("type", "someType");
+        JsonObject query = object("parent_type", "someType");
         query.add("query", object("match_all", new JsonObject()));
         assertThat(queryAsJson, is(
                 object("has_parent",

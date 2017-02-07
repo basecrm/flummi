@@ -6,30 +6,21 @@ import com.google.gson.JsonObject;
 public class BoolQueryBuilder implements QueryBuilder {
     private JsonArray mustFilter = new JsonArray();
     private JsonArray mustNotFilter = new JsonArray();
+    private JsonArray shouldFilter = new JsonArray();
 
     @Override
     public JsonObject build() {
-        if(mustFilter.size() == 0 && mustNotFilter.size() == 0) {
-            throw new RuntimeException("mustFilter and mustNotFilter are empty");
-        }
-        JsonObject jsonObject = new JsonObject();
-        JsonObject boolObject = new JsonObject();
-        jsonObject.add("bool", boolObject);
-        if (mustFilter.size() > 0) {
-            if (mustFilter.size() == 1) {
-                boolObject.add("must", mustFilter.get(0));
-            } else {
-                boolObject.add("must", mustFilter);
-            }
+        if (mustFilter.size() == 0 && mustNotFilter.size() == 0 && shouldFilter.size() == 0) {
+            throw new RuntimeException("mustFilter, mustNotFilter, and should filters are empty");
         }
 
-        if (mustNotFilter.size() > 0) {
-            if (mustNotFilter.size() == 1) {
-                boolObject.add("must_not", mustNotFilter.get(0));
-            } else {
-                boolObject.add("must_not", mustNotFilter);
-            }
-        }
+        JsonObject boolObject = new JsonObject();
+        addBoolFilter(boolObject, "must", mustFilter);
+        addBoolFilter(boolObject, "must_not", mustNotFilter);
+        addBoolFilter(boolObject, "should", shouldFilter);
+
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.add("bool", boolObject);
 
         return jsonObject;
     }
@@ -52,7 +43,28 @@ public class BoolQueryBuilder implements QueryBuilder {
         must(queryBuilder.build());
         return this;
     }
+
     public void mustNot(QueryBuilder queryBuilder) {
         mustNot(queryBuilder.build());
+    }
+
+    public BoolQueryBuilder should(JsonObject filter) {
+        this.shouldFilter.add(filter);
+        return this;
+    }
+
+    public BoolQueryBuilder should(QueryBuilder queryBuilder) {
+        should(queryBuilder.build());
+        return this;
+    }
+
+    private void addBoolFilter(JsonObject boolObject, String name, JsonArray filter) {
+        if (filter.size() > 0) {
+            if (filter.size() == 1) {
+                boolObject.add(name, filter.get(0));
+            } else {
+                boolObject.add(name, filter);
+            }
+        }
     }
 }
